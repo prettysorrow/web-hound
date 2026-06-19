@@ -1,0 +1,13 @@
+services:
+  backend-db:
+    image: postgres:16-alpine
+    container_name: web-hound-backend-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: web-hound
+      POSTGRES_PASSWORD: web-hound
+      POSTGRES_DB: web_hound_backend_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./Database:/var/lib/postgresql/data
