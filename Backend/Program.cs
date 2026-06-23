@@ -1,15 +1,30 @@
-using Backend;
 using Core;
+using Services;
+using EntityFramework;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
 
-var pat = config["github_pat"] ?? throw new IsNotSpecifiedException("GitHub PAT");
+var github_pat = config["github_pat"] ?? throw new IsNotSpecifiedException("GitHub PAT");
 var url = config["backend_url"] ?? throw new IsNotSpecifiedException("Backend URL");
 var postgre = config["db_connection"] ?? throw new IsNotSpecifiedException("Database Connection");
 
-builder.Services.AddSingleton(new GitHub(pat));
+builder.Services.AddHttpClient();
+
+builder.Services.AddSingleton<IRequestsProvider>(serviceProvider =>
+{
+    var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
+    return new RequestsProvider(httpClientFactory);
+});
+
+builder.Services.AddSingleton<GitHub>(serviceProvider =>
+{
+    var requestsProvider = serviceProvider.GetRequiredService<IRequestsProvider>();
+    return new GitHub(github_pat, requestsProvider);
+}
+);
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
