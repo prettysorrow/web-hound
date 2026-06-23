@@ -1,6 +1,6 @@
-using Core;
+namespace EntityFramework;
 
-namespace Backend;
+using Core;
 
 public static class DbModels
 {
@@ -29,6 +29,7 @@ public static class DbModels
         public long UID { get; set; }
         public DateTime Time { get; set; }
         public long VerboseUserUID { get; set; }
+        public VerboseUser VerboseUser { get; set; } = null!;
 
         public Request(long VerboseUserUID)
         {

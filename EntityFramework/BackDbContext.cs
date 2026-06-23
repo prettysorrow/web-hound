@@ -1,4 +1,4 @@
-namespace Backend;
+namespace EntityFramework;
 
 using Microsoft.EntityFrameworkCore;
 
@@ -26,5 +26,11 @@ public class BackDbContext : DbContext
             .HasMany(e => e.UserFollowing)
             .WithOne()
             .HasForeignKey("FollowingOfUID");
+
+
+        modelBuilder.Entity<DbModels.Request>()
+            .HasOne(r => r.VerboseUser)
+            .WithMany()
+            .HasForeignKey(r => r.VerboseUserUID);
     }
 }
