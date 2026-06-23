@@ -1,4 +1,4 @@
-namespace Core;
+namespace Services;
 
 public class IsNotSpecifiedException : Exception
 {
