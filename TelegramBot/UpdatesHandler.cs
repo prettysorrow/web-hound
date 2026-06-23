@@ -32,7 +32,6 @@ public partial class UpdatesHandler : IUpdateHandler
         try
         {
             await botClient.SendMessage(chatId: message.Chat.Id, text, cancellationToken: cancellationToken);
-            this._logger.Write(LogMessageType.Info, $"sent start message to {message.From?.Username}");
         }
         catch (Exception ex)
         {
@@ -40,7 +39,7 @@ public partial class UpdatesHandler : IUpdateHandler
         }
     }
 
-    private Task HandleStartMessage(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
+    private Task SendUsageMessage(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
     {
         var text = "usage:\n" +
                       "/start            <---  print this message\n" +
@@ -48,6 +47,38 @@ public partial class UpdatesHandler : IUpdateHandler
                       "/history          <---  your requests history\n";
 
         return TrySendResponse(text, botClient, message, cancellationToken);
+    }
+
+    private async Task HandleStartMessage(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
+    {
+        var username = message.Chat.Username ?? "guest";
+        var greetings = $"hello, {username}!";
+
+        this._logger.Write(LogMessageType.Info, $"received start message from {username}");
+
+        await TrySendResponse(text: greetings, botClient, message, cancellationToken);
+
+        this._logger.Write(LogMessageType.Info, $"sent greetings to {username}");
+
+        await SendUsageMessage(botClient, message, cancellationToken);
+
+        this._logger.Write(LogMessageType.Info, $"sent usage message to {username}");
+    }
+
+    private async Task HandleUnknownMessage(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
+    {
+        var username = message.Chat.Username ?? "guest";
+        var error = "unknown command";
+
+        this._logger.Write(LogMessageType.Info, $"received invalid message from {username}");
+
+        await TrySendResponse(text: error, botClient, message, cancellationToken);
+
+        this._logger.Write(LogMessageType.Info, $"sent error message to {username}");
+
+        await SendUsageMessage(botClient, message, cancellationToken);
+
+        this._logger.Write(LogMessageType.Info, $"sent usage message to {username}");
     }
 
     private static void WriteVerboseUser(StringBuilder buf, DbModels.VerboseUser user)
@@ -96,7 +127,22 @@ public partial class UpdatesHandler : IUpdateHandler
             return text.ToString();
         }
 
+        var username = message.Chat.Username ?? "guess";
+        this._logger.Write(LogMessageType.Info, $"received history message from {username}");
+
         var requests = await FetchRequests(cancellationToken);
+        this._logger.Write(LogMessageType.Info, $"fetched history for {username}");
+
+        if (requests.Count == 0)
+        {
+            this._logger.Write(LogMessageType.Info, $"{username}'s history is empty");
+            var text = "your history is empty";
+            await TrySendResponse(text, botClient, message, cancellationToken);
+            this._logger.Write(LogMessageType.Info, $"sent 'history is empty' message to {username}");
+            return;
+        }
+
+        this._logger.Write(LogMessageType.Info, $"{username}'s history contains {requests.Count} requests");
         var tasks = requests.Select(request => TrySendResponse(MakeResponse(request), botClient, message, cancellationToken));
         await Task.WhenAll(tasks);
     }
@@ -137,7 +183,10 @@ public partial class UpdatesHandler : IUpdateHandler
             return;
         }
 
+        var username = message.Chat.Username ?? "guest";
         var text = message.Text.Trim();
+
+        this._logger.Write(LogMessageType.Info, $"received message from {username}: {text}");
 
         if (StartRegex().IsMatch(text))
         {
@@ -149,9 +198,15 @@ public partial class UpdatesHandler : IUpdateHandler
         }
         else if (FindRegex().Match(text) is { Success: true } match)
         {
-            var username = match.Groups["username"].Value;
-            await HandleFind(username, botClient, message, cancellationToken);
+            var victim = match.Groups["username"].Value;
+            await HandleFind(username: victim, botClient, message, cancellationToken);
         }
+        else
+        {
+            await HandleUnknownMessage(botClient, message, cancellationToken);
+        }
+
+        this._logger.Write(LogMessageType.Info, $"handled message from {username}: {text}");
     }
 
     [GeneratedRegex(@"^/start$", RegexOptions.IgnoreCase, "en-US")]
