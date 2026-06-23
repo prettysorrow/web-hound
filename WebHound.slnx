@@ -1,4 +1,7 @@
 <Solution>
   <Project Path="Backend/Backend.csproj" />
   <Project Path="Core/Core.csproj" />
+  <Project Path="EntityFramework/EntityFramework.csproj" />
+  <Project Path="Services/Services.csproj" />
+  <Project Path="TelegramBot/TelegramBot.csproj" />
 </Solution>
