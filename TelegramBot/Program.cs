@@ -50,4 +50,10 @@ builder.UseDefaultServiceProvider(services =>
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<BackDbContext>();
+    await dbContext.Database.MigrateAsync();
+}
+
 await app.RunAsync();
