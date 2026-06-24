@@ -5,30 +5,30 @@ using Microsoft.EntityFrameworkCore;
 public class BackDbContext : DbContext
 {
     public BackDbContext(DbContextOptions<BackDbContext> options) : base(options) { }
-    public DbSet<DbModels.VerboseUser> VerboseUsers => Set<DbModels.VerboseUser>();
-    public DbSet<DbModels.FollowerUser> Followers => Set<DbModels.FollowerUser>();
-    public DbSet<DbModels.FollowingUser> Followings => Set<DbModels.FollowingUser>();
-    public DbSet<DbModels.Request> Requests => Set<DbModels.Request>();
+    public DbSet<Entities.VerboseUser> VerboseUsers => Set<Entities.VerboseUser>();
+    public DbSet<Entities.FollowerUser> Followers => Set<Entities.FollowerUser>();
+    public DbSet<Entities.FollowingUser> Followings => Set<Entities.FollowingUser>();
+    public DbSet<Entities.Request> Requests => Set<Entities.Request>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<DbModels.FollowerUser>().HasKey(e => e.UID);
-        modelBuilder.Entity<DbModels.FollowingUser>().HasKey(e => e.UID);
-        modelBuilder.Entity<DbModels.Request>().HasKey(e => e.UID);
-        modelBuilder.Entity<DbModels.VerboseUser>().HasKey(e => e.UID);
+        modelBuilder.Entity<Entities.FollowerUser>().HasKey(e => e.UID);
+        modelBuilder.Entity<Entities.FollowingUser>().HasKey(e => e.UID);
+        modelBuilder.Entity<Entities.Request>().HasKey(e => e.UID);
+        modelBuilder.Entity<Entities.VerboseUser>().HasKey(e => e.UID);
 
-        modelBuilder.Entity<DbModels.VerboseUser>()
+        modelBuilder.Entity<Entities.VerboseUser>()
             .HasMany(e => e.UserFollowers)
             .WithOne()
             .HasForeignKey("FollowerOfUID");
 
-        modelBuilder.Entity<DbModels.VerboseUser>()
+        modelBuilder.Entity<Entities.VerboseUser>()
             .HasMany(e => e.UserFollowing)
             .WithOne()
             .HasForeignKey("FollowingOfUID");
 
 
-        modelBuilder.Entity<DbModels.Request>()
+        modelBuilder.Entity<Entities.Request>()
             .HasOne(r => r.VerboseUser)
             .WithMany()
             .HasForeignKey(r => r.VerboseUserUID);
