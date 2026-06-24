@@ -126,7 +126,14 @@ commands["start"] = function()
     exec('docker compose start "' .. SERVICE .. '"', make_failfast("can not start container"))
 end
 
+commands["recreate"] = function()
+    commands["drop"]()
+    commands["start"]()
+    commands["update"]()
+end
+
 local cmd = arg[1]
+
 if not cmd or not commands[cmd] then
     print("Usage: lua backend.db <command>")
     print("Commands:")
