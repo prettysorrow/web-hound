@@ -1,6 +1,6 @@
 Database/
 .envrc
-Backend/Migrations
+EntityFramework/Migrations
 
 ## A streamlined .gitignore for modern .NET projects
 ## including temporary files, build results, and
