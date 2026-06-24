@@ -2,7 +2,6 @@
 
 using Core;
 using Services;
-using EntityFramework;
 
 using Telegram.Bot;
 using Telegram.Bot.Types;
@@ -10,21 +9,18 @@ using Telegram.Bot.Types.Enums;
 
 using System.Text.RegularExpressions;
 using System.Text;
-using Microsoft.EntityFrameworkCore;
 using Telegram.Bot.Polling;
-using Microsoft.AspNetCore.Http;
+using System.Net.Http.Json;
 
 public partial class UpdatesHandler : IUpdateHandler
 {
-    private GitHub _gitHub { get; init; }
-    private IServiceScopeFactory _serviceScopeFactory { get; init; }
+    private IHttpClientFactory _httpClientFactory { get; init; }
     private ILogger _logger { get; init; }
 
-    public UpdatesHandler(GitHub gitHub, IServiceScopeFactory serviceScopeFactory, ILogger logger)
+    public UpdatesHandler(IHttpClientFactory httpClientFactory, ILogger logger)
     {
+        this._httpClientFactory = httpClientFactory;
         this._logger = logger;
-        this._gitHub = gitHub;
-        this._serviceScopeFactory = serviceScopeFactory;
     }
 
     private async Task TrySendResponse(string text, ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
@@ -81,45 +77,29 @@ public partial class UpdatesHandler : IUpdateHandler
         this._logger.Write(LogMessageType.Info, $"sent usage message to {username}");
     }
 
-    private static void WriteVerboseUser(StringBuilder buf, DbModels.VerboseUser user)
+    private static void WriteVerboseUser(StringBuilder buf, VerboseUser user)
     {
-        buf.Append($"username: {user.UserLogin}\n");
-        buf.Append($"uid: {user.UserID}\n");
+        buf.Append($"username: {user.Login}\n");
+        buf.Append($"uid: {user.Id}\n");
 
-        var followers = user.UserFollowers;
+        var followers = user.Followers ?? [];
         buf.Append($"{followers.Count} followers:\n");
         foreach (var follower in followers)
         {
-            buf.Append($"\t{follower.UserLogin} with UID = {follower.UserID}\n");
+            buf.Append($"\t{follower.Login} with UID = {follower.Id}\n");
         }
 
-        var followings = user.UserFollowing;
+        var followings = user.Following ?? [];
         buf.Append($"{followings.Count} following:\n");
         foreach (var following in followings)
         {
-            buf.Append($"\t{following.UserLogin} with UID = {following.UserID}\n");
+            buf.Append($"\t{following.Login} with UID = {following.Id}\n");
         }
-    }
-
-    private async Task<List<DbModels.Request>> FetchRequests(CancellationToken cancellationToken)
-    {
-        using var scope = this._serviceScopeFactory.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<BackDbContext>();
-
-        var request = dbContext.Requests
-                .Include(r => r.VerboseUser)
-                    .ThenInclude(r => r.UserFollowers)
-                .Include(r => r.VerboseUser)
-                    .ThenInclude(r => r.UserFollowing)
-                .ToListAsync(cancellationToken)
-        ;
-
-        return await request;
     }
 
     private async Task HandleHistory(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
     {
-        static string MakeResponse(DbModels.Request request)
+        static string MakeResponse(Request request)
         {
             var text = new StringBuilder();
             text.Append($"time: {request.Time}\n");
@@ -127,13 +107,14 @@ public partial class UpdatesHandler : IUpdateHandler
             return text.ToString();
         }
 
-        var username = message.Chat.Username ?? "guess";
+        var username = message.Chat.Username ?? "guest";
         this._logger.Write(LogMessageType.Info, $"received history message from {username}");
 
-        var requests = await FetchRequests(cancellationToken);
+        var backend = _httpClientFactory.CreateClient("Backend");
+        var requests = await backend.GetFromJsonAsync<List<Request>>("/github/history", cancellationToken);
         this._logger.Write(LogMessageType.Info, $"fetched history for {username}");
 
-        if (requests.Count == 0)
+        if (requests is null || requests.Count == 0)
         {
             this._logger.Write(LogMessageType.Info, $"{username}'s history is empty");
             var text = "your history is empty";
@@ -149,21 +130,12 @@ public partial class UpdatesHandler : IUpdateHandler
 
     private async Task HandleFind(string username, ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
     {
-        using var scope = this._serviceScopeFactory.CreateScope();
-        var _dbContext = scope.ServiceProvider.GetRequiredService<BackDbContext>();
-
-        var verbose = await _gitHub.GetUser(username);
-        var verboseModel = DbModels.ToModel(verbose);
-
-        await _dbContext.VerboseUsers.AddAsync(verboseModel, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        var requestModel = new DbModels.Request(VerboseUserUID: verboseModel.UID);
-        await _dbContext.Requests.AddAsync(requestModel, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        var backend = _httpClientFactory.CreateClient("Backend");
+        var user = await backend.GetFromJsonAsync<VerboseUser>($"github/find/{username}", cancellationToken);
+        if (user is null) return;
 
         var text = new StringBuilder();
-        WriteVerboseUser(text, verboseModel);
+        WriteVerboseUser(text, user);
         await TrySendResponse(text.ToString(), botClient, message, cancellationToken);
     }
 
@@ -221,6 +193,6 @@ public partial class UpdatesHandler : IUpdateHandler
     public Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, HandleErrorSource source, CancellationToken cancellationToken)
     {
         _logger.Write(LogMessageType.Fatal, exception.Message);
-        return Task.FromResult(Results.Problem(detail: exception.Message));
+        return Task.CompletedTask;
     }
 }

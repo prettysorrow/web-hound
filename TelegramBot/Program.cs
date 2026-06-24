@@ -7,21 +7,13 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = Host.CreateDefaultBuilder(args);
 
-// database services
+// backend resp api services
 builder.ConfigureServices((context, services) =>
 {
-    var db_connection = context.Configuration["db_connection"] ?? throw new IsNotSpecifiedException("Database connection for Telegram Bot");
-    services.AddDbContext<BackDbContext>(options => options.UseNpgsql(connectionString: db_connection));
+    var backend_url = context.Configuration["backend_url"] ?? throw new IsNotSpecifiedException("Backend URL for Telegram Bot");
+    services.AddHttpClient("Backend", client => client.BaseAddress = new Uri(backend_url));
 }
 );
-
-// github rest api services
-builder.ConfigureServices((context, services) =>
-{
-    var github_pat = context.Configuration["github_pat"] ?? throw new IsNotSpecifiedException("GitHub PAT for Telegram Bot");
-    services.AddSingleton<GitHub>(services => new GitHub(github_pat, services.GetRequiredService<IRequestsProvider>()));
-    services.AddSingleton<IRequestsProvider, RequestsProvider>();
-});
 
 // aux services
 builder.ConfigureServices((context, services) =>
@@ -49,11 +41,5 @@ builder.UseDefaultServiceProvider(services =>
 });
 
 var app = builder.Build();
-
-using (var scope = app.Services.CreateScope())
-{
-    var dbContext = scope.ServiceProvider.GetRequiredService<BackDbContext>();
-    await dbContext.Database.MigrateAsync();
-}
 
 await app.RunAsync();
